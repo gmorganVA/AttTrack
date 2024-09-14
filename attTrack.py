@@ -7,20 +7,21 @@
 # You can find out the names and other attributes of different devices using:
 # cat /proc/bus/input/devices
 
-import sys
-import inspect
-import serial
+"""Gather barcode data from badges to track attendance
+   QR code format is specific to Trail Life USA badges"""
+import argparse
+import logging
 import time
 from datetime import datetime
 from openpyxl import Workbook
 
 import evdev
-#from evdev import device.InputDevice, ecodes, util.list_devices
 
 class AttTrack:
-    def __init__(self):
-        self.mVendorStr = "0x26f1"
-        self.mProductStr = "0x5651"
+    def __init__(self, logging, vendor, product):
+        self.logging = logging
+        self.mVendorStr = vendor
+        self.mProductStr = product
         self.mPollIntervalSecs = 1
         self.mExclusiveAccess = 1
         self.mDocumentCreated = False
@@ -125,23 +126,26 @@ class AttTrack:
         }
     
     def parse_key_to_char(self, val):
+        """Convert key code to character"""
         return self.CODE_MAP_CHAR[val] if val in self.CODE_MAP_CHAR else ""
 
     def list_devices(self):
-        print("List of devices")
-        print("===============")
+        """Log all barcode scanner devices"""
+        self.logging.info("List of devices")
+        self.logging.info("===============")
         devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
         for aDevice in devices:
-            print("  {}\t{}\t{}\t{}".format(aDevice.path,
+            self.logging.info("  {}\t{}\t{}\t{}".format(aDevice.path,
                 aDevice.name,
                 hex(aDevice.info.vendor),
                 hex(aDevice.info.product)))
-        print("===============")
+        self.logging.info("===============")
 
     def find_device(self):
+        """Find USB barcode reader device and grab it"""
         # Wait for device available
         deviceNotFound = True
-        print("Looking for device")
+        self.logging.info("Looking for device")
         while (deviceNotFound):
             # Read list of devices
             devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
@@ -149,7 +153,7 @@ class AttTrack:
                 if (hex(aDevice.info.vendor) == self.mVendorStr and
                     hex(aDevice.info.product) == self.mProductStr):
                     logMsg = "Found device: " + aDevice.name + " on " + aDevice.path
-                    print(logMsg)
+                    self.logging.info(logMsg)
                     self.mBarcodeReader = evdev.device.InputDevice(aDevice.path)
                     if int(self.mExclusiveAccess) == 1:
                         self.mBarcodeReader.grab()
@@ -158,30 +162,39 @@ class AttTrack:
                 else:
                     time.sleep(self.mPollIntervalSecs)
 
-
-    def create_document(self):
+    def create_document(self, filename):
+        """Create spreadsheet for saving attendance data"""
         if not self.mDocumentCreated:
+            self.filename = filename
             self.wb = Workbook()
-            self.ws = self.wb.active
-            self.ws['A1'] = 'Attendance Scans'
-            self.row = 2
-            dt = datetime.now()
-            self.filename = dt.strftime('%Y%m%d_%H%M%S') + '.xlsx'
-            print(f'Creating document: {self.filename}')
+            self.ws = self.wb.create_sheet('Attendance', 0)
+            del self.wb['Sheet']
+            self.row = 1
+            self.logging.info(f'Creating document: {self.filename}')
             self.mDocumentCreated = True
 
     def add_barcode_to_document(self, barcodeStr):
-        refStr = f"A{self.row}"
-        self.ws[refStr] = barcodeStr
+        """Add barcode data to spreadsheet"""
+        # Split barcode into member ID and user ID fields and
+        # put in separate columms in the spreadsheet
+        idCellRef = f"A{self.row}"
+        memberIdCellRef = f"B{self.row}"
+        (memberIdStr, idStr) = barcodeStr.split("\\")
+        idStr = idStr.strip().lower()
+        memberIdStr = memberIdStr.strip()
+        self.ws[idCellRef] = idStr
+        self.ws[memberIdCellRef] = memberIdStr
         self.row = self.row + 1
 
     def close_document(self):
+        """Close spreadsheet / write to file"""
         if self.mDocumentCreated:
-            print("Closing file: " + self.filename)
+            self.logging.info("Closing file: " + self.filename)
             self.wb.save(self.filename)
             self.mDocumentCreated = False
 
     def close_device(self, deviceMissing = False):
+        """Close USB barcode scanner device"""
         if deviceMissing:
             self.mDeviceGrabbed = False
             if self.mBarcodeReader is not None:
@@ -189,24 +202,46 @@ class AttTrack:
         else: # Device exists, need proper shutdown
             if self.mBarcodeReader is not None:
                 if self.mDeviceGrabbed:
-                    print("Releasing device")
+                    self.logging.info("Releasing device")
                     self.mBarcodeReader.ungrab()
                     self.mDeviceGrabbed = False
-                print("Closing device")
+                self.logging.info("Closing device")
                 self.mBarcodeReader.close()
         self.mBarcodeReader = None
 
-if __name__ == "__main__":
-    myAT = AttTrack()
+def main():
+    # Process command line input
+    parser = argparse.ArgumentParser(
+        prog="attTrack",
+        description="Gather info from badge QR codes for attendance tracking"
+    )
+    dt = datetime.now()
+    defaultFilename = dt.strftime('%Y%m%d_%H%M%S') + '.xlsx'
+    parser.add_argument('-f', '--filename', help='Attendance file', 
+        default=defaultFilename)
+    parser.add_argument('-l', '--log', help='Log file',
+        default='./AttTrack.log')
+    parser.add_argument('--vendor', help="USB Vendor String (hex)",
+        default="0x26f1")
+    parser.add_argument('--product', help="USB Product String (hex)",
+        default="0x5651")
+    args = parser.parse_args()
+    # Set up logging
+    logging.basicConfig(level=logging.INFO, filename=args.log)
 
+    # Set up attendance tracking
+    myAT = AttTrack(logging, args.vendor, args.product)
+
+    # Log devices at startup
     myAT.list_devices()
 
+    # Main loop for processing barcodes
     continueProcessing = True
     while (continueProcessing):
         reader = myAT.find_device()
-        myAT.create_document()
+        myAT.create_document(args.filename)
 
-        print("Waiting for scan")
+        logging.info("Waiting for scan")
         continueScanning = True
         barcodeStr = ""
         while (continueScanning):
@@ -222,29 +257,34 @@ if __name__ == "__main__":
                                 if (barcodeStr == "948NINJADOWN"):
                                     continueScanning = False
                                     continueProcessing = False
-                                    print("Exit code scanned")
+                                    logging.info("Exit code scanned")
                                     myAT.close_document()
                                     myAT.close_device()
                                     break
                                 logMsg = "Barcode: [" + barcodeStr + "]"
-                                print(logMsg)
+                                logging.info(logMsg)
                                 # Save current barcode
                                 myAT.add_barcode_to_document(barcodeStr)
                                 barcodeStr = ""
             except FileNotFoundError as ex:
                 # Device not found, return to device search
-                print("Device not found, returning to search!")
+                logging.info("Device not found, returning to search!")
                 continueScanning = False
                 myAT.close_document()
             except OSError as ex:
                 # Device disconnected
-                print("Device disconnected")
+                logging.info("Device disconnected")
                 continueScanning = False
                 myAT.close_device(True)
             except KeyboardInterrupt:
                 continueScanning = False
                 continueProcessing = False
-                print("")
+                logging.info("")
                 myAT.close_document()
                 myAT.close_device()
+
+if __name__ == "__main__":
+    main()
+
+    
 
