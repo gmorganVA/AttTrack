@@ -6,7 +6,7 @@ Attendance tracking from scanning QR code on Trail Life badges using a USB attac
 - Currently uses a LED attached to GPIO 27 to indicate status.  Looking to connect a small, low power display to show more use friendly status.
 - Using [Sonew Hands-free QR Barcode Scanner Wired Omnidirectional Automatic Barcode Reader](https://a.co/d/9T77YGB)
 - Add an empty file named "shutdown" to your flash drive to enable auto shutdown when special QR code is scanned
-- Special shutdown QR code in 948NinjaDown.pdf ;-)
+- Special shutdown QR code in [Shutdown QR Code](948NinjaDown.pdf) ;-)
 
 ## Setup on Linux
 
