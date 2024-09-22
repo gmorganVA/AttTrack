@@ -1,0 +1,10 @@
+[Unit]
+Description=AttTrack
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/opt/AttTrack/start.sh
+
+[Install]
+WantedBy=multi-user.target
