@@ -33,3 +33,11 @@ Attendance tracking from scanning QR codes using a USB attached reader attached 
   ```
   - Set up ownership: ```sudo chmod 644 /lib/systemd/system/attTrack.service```
   - Enable service: ```sudo systemctl enable attTrack.service```
+- Copy code from this repo to third party apps directory: ```/opt/AttTrack```
+- Set up code
+```shell
+pushd /opt/AttTrack
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+deactivate
