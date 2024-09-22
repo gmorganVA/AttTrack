@@ -12,6 +12,7 @@
 import argparse
 import logging
 import time
+import RPi.GPIO as GPIO
 from datetime import datetime
 from openpyxl import Workbook
 
@@ -148,6 +149,7 @@ class AttTrack:
         self.logging.info("Looking for device")
         while (deviceNotFound):
             # Read list of devices
+            GPIO.output(27,GPIO.HIGH)
             devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
             for aDevice in devices:
                 if (hex(aDevice.info.vendor) == self.mVendorStr and
@@ -160,6 +162,7 @@ class AttTrack:
                         self.mDeviceGrabbed = True
                     return self.mBarcodeReader
                 else:
+                    GPIO.output(27,GPIO.LOW)
                     time.sleep(self.mPollIntervalSecs)
 
     def create_document(self, filename):
@@ -235,6 +238,12 @@ def main():
     # Log devices at startup
     myAT.list_devices()
 
+    # Init GPIO
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
+    GPIO.setup(27,GPIO.OUT)
+    GPIO.output(27,GPIO.LOW)
+
     # Main loop for processing barcodes
     continueProcessing = True
     while (continueProcessing):
@@ -245,6 +254,7 @@ def main():
         continueScanning = True
         barcodeStr = ""
         while (continueScanning):
+            GPIO.output(27,GPIO.HIGH)
             try:
                 for event in reader.read_loop():
                     if event.type == evdev.ecodes.EV_KEY:
@@ -282,6 +292,9 @@ def main():
                 logging.info("")
                 myAT.close_document()
                 myAT.close_device()
+
+    # Clean up GPIO
+    GPIO.cleanup()
 
 if __name__ == "__main__":
     main()
