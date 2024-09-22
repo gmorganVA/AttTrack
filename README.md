@@ -1,6 +1,11 @@
 # AttTrack
 
-Attendance tracking from scanning QR codes using a USB attached reader attached to a Raspberry Pi or similar computer running Linux.  Logs and spreadsheet are copied to a USB flash drive after a shutdown QR code is scanned.
+Attendance tracking from scanning QR code on Trail Life badges using a USB attached reader attached to a Raspberry Pi or similar computer running Linux.  Logs and spreadsheet are copied to a USB flash drive after a shutdown QR code is scanned.  Use [TLCAttendance](https://github.com/gmorganVA/TLCAttendance) to update [Trail Life Connect](https://www.traillifeconnect.com/).
+
+## Notes
+- Currently uses a LED attached to GPIO 27 to indicate status.  Looking to connect a small, low power display to show more use friendly status.
+- Using [Sonew Hands-free QR Barcode Scanner Wired Omnidirectional Automatic Barcode Reader](https://a.co/d/9T77YGB)
+- Add an empty file named "shutdown" to your flash drive to enable auto shutdown when special QR code is scanned
 
 ## Setup on Linux
 
