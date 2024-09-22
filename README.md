@@ -43,6 +43,8 @@ Attendance tracking from scanning QR code on Trail Life badges using a USB attac
 - Set up code
 ```shell
 pushd /opt/AttTrack
+chmod +x start.sh
+chmod +x attTrack.py
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
